@@ -1,6 +1,6 @@
 package models
 
-import "time"
+
 
 type Container struct {
 	ID      string   `json:"id"`
@@ -49,7 +49,7 @@ type Volume struct {
 	Driver     string            `json:"driver"`
 	Mountpoint string            `json:"mountpoint"`
 	Labels     map[string]string `json:"labels"`
-	CreatedAt  time.Time         `json:"created_at"`
+	CreatedAt  string            `json:"created_at"`
 }
 
 type Stats struct {
@@ -95,4 +95,15 @@ type GraphLink struct {
 type GraphData struct {
 	Nodes []GraphNode `json:"nodes"`
 	Links []GraphLink `json:"links"`
+}
+
+type Project struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	NetworkID  string `json:"network_id"`
+	Containers int    `json:"containers"`
+}
+
+type TunnelRequest struct {
+	Token string `json:"token"`
 }

@@ -47,6 +47,10 @@ func main() {
 		api.GET("/volumes", h.ListVolumes)
 
 		api.GET("/graph", h.GetGraphData)
+
+		api.POST("/projects", h.CreateProject)
+		api.GET("/projects", h.ListProjects)
+		api.POST("/projects/:name/tunnel", h.CreateTunnel)
 	}
 
 	log.Println("Server starting on :8080")
