@@ -96,3 +96,15 @@ func ContainerID(id string) error {
 	}
 	return nil
 }
+
+// containerNameRegex validates Docker container names.
+// Names must start with alphanumeric character and can contain alphanumeric, underscore, hyphen, and period.
+var containerNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$`)
+
+// ContainerName validates a Docker container name.
+func ContainerName(name string) error {
+	if !containerNameRegex.MatchString(name) {
+		return fmt.Errorf("container name must be 1-128 characters, starting with alphanumeric, containing only alphanumeric, underscore, hyphen, or period")
+	}
+	return nil
+}

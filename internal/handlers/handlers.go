@@ -18,10 +18,10 @@ import (
 
 // Handler holds dependencies for all HTTP handlers.
 type Handler struct {
-	docker  docker.DockerClient
-	cfg     *config.Config
-	jobs    *jobs.Tracker
-	logger  *slog.Logger
+	docker docker.DockerClient
+	cfg    *config.Config
+	jobs   *jobs.Tracker
+	logger *slog.Logger
 }
 
 // New creates a new Handler with all required dependencies.
@@ -462,4 +462,40 @@ func (h *Handler) CreateTunnel(c *gin.Context) {
 
 	h.logger.Info("cloudflare tunnel started", "project", projectName)
 	c.JSON(http.StatusOK, gin.H{"message": "Cloudflared tunnel started"})
+}
+
+// CreateContainer creates a new container from an existing image with custom configuration.
+func (h *Handler) CreateContainer(c *gin.Context) {
+	var req models.CreateContainerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error(), Code: "INVALID_INPUT"})
+		return
+	}
+
+	// Validate container name if provided
+	if req.Name != "" {
+		if err := validate.ContainerName(req.Name); err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error(), Code: "INVALID_CONTAINER_NAME"})
+			return
+		}
+	}
+
+	// Try to pull the image first (in case it's not local)
+	if err := h.docker.PullImage(c.Request.Context(), req.Image); err != nil {
+		h.logger.Warn("failed to pull image, trying with local", "image", req.Image, "error", err)
+	}
+
+	// Create and start the container
+	containerID, containerName, err := h.docker.CreateContainerFromImage(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error(), Code: "DOCKER_ERROR"})
+		return
+	}
+
+	h.logger.Info("container created", "id", containerID, "name", containerName, "image", req.Image)
+	c.JSON(http.StatusCreated, models.CreateContainerResponse{
+		ID:      containerID,
+		Name:    containerName,
+		Message: "Container created and started successfully",
+	})
 }

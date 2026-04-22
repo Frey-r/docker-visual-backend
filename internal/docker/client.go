@@ -2,16 +2,21 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 
+	"docker-visual/internal/models"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 )
 
 // DockerClient defines the interface for Docker operations.
@@ -30,6 +35,8 @@ type DockerClient interface {
 	RunCloudflaredContainer(ctx context.Context, projectName, networkID, token string) error
 	BuildImage(ctx context.Context, buildContextPath, imageName string) error
 	CreateAndStartContainer(ctx context.Context, imageName, networkID, projectName string) error
+	CreateContainerFromImage(ctx context.Context, req models.CreateContainerRequest) (string, string, error)
+	PullImage(ctx context.Context, imageName string) error
 	Ping(ctx context.Context) error
 	Close() error
 }
@@ -171,4 +178,94 @@ func (c *Client) CreateAndStartContainer(ctx context.Context, imageName string, 
 	}
 
 	return c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
+}
+
+func (c *Client) PullImage(ctx context.Context, imageName string) error {
+	reader, err := c.cli.ImagePull(ctx, imageName, image.PullOptions{})
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	_, err = io.Copy(io.Discard, reader)
+	return err
+}
+
+func (c *Client) CreateContainerFromImage(ctx context.Context, req models.CreateContainerRequest) (string, string, error) {
+	// Build environment variables slice
+	var envVars []string
+	for key, value := range req.Env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	// Build port bindings
+	exposedPorts := nat.PortSet{}
+	portBindings := nat.PortMap{}
+	for _, p := range req.Ports {
+		proto := p.Protocol
+		if proto == "" {
+			proto = "tcp"
+		}
+		containerPort := nat.Port(fmt.Sprintf("%d/%s", p.ContainerPort, proto))
+		exposedPorts[containerPort] = struct{}{}
+		portBindings[containerPort] = []nat.PortBinding{
+			{HostIP: "0.0.0.0", HostPort: fmt.Sprintf("%d", p.HostPort)},
+		}
+	}
+
+	// Build volume mounts
+	var mounts []mount.Mount
+	for _, v := range req.Volumes {
+		mounts = append(mounts, mount.Mount{
+			Type:     mount.TypeBind,
+			Source:   v.HostPath,
+			Target:   v.ContainerPath,
+			ReadOnly: v.ReadOnly,
+		})
+	}
+
+	// Determine restart policy
+	restartPolicy := container.RestartPolicy{Name: container.RestartPolicyDisabled}
+	switch req.RestartPolicy {
+	case "always":
+		restartPolicy = container.RestartPolicy{Name: container.RestartPolicyAlways}
+	case "unless-stopped":
+		restartPolicy = container.RestartPolicy{Name: container.RestartPolicyUnlessStopped}
+	case "on-failure":
+		restartPolicy = container.RestartPolicy{Name: container.RestartPolicyOnFailure}
+	}
+
+	// Container config
+	config := &container.Config{
+		Image:        req.Image,
+		Env:          envVars,
+		ExposedPorts: exposedPorts,
+		Labels: map[string]string{
+			"docker-dashboard.managed": "true",
+		},
+	}
+
+	// Host config
+	hostConfig := &container.HostConfig{
+		PortBindings:  portBindings,
+		Mounts:        mounts,
+		RestartPolicy: restartPolicy,
+	}
+
+	// Network config
+	if req.NetworkID != "" {
+		hostConfig.NetworkMode = container.NetworkMode(req.NetworkID)
+	}
+
+	// Create container
+	resp, err := c.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, req.Name)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Start container
+	if err := c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return resp.ID, req.Name, err
+	}
+
+	return resp.ID, req.Name, nil
 }

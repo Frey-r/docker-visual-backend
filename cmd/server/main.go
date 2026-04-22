@@ -71,6 +71,7 @@ func main() {
 		protected.Use(middleware.APIKeyAuth(cfg.APIKey))
 		{
 			protected.GET("/containers", h.ListContainers)
+			protected.POST("/containers", h.CreateContainer)
 			protected.GET("/containers/:id", h.GetContainer)
 			protected.POST("/containers/:id/start", h.StartContainer)
 			protected.POST("/containers/:id/stop", h.StopContainer)
