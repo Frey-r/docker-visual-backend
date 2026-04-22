@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // UserStore handles user persistence.
@@ -14,7 +14,7 @@ type UserStore struct {
 
 // NewUserStore creates a new user store with SQLite.
 func NewUserStore(dbPath string) (*UserStore, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
