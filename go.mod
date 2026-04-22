@@ -1,6 +1,6 @@
 module docker-visual
 
-go 1.25.0
+go 1.23
 
 require (
 	github.com/docker/docker v28.5.2+incompatible
