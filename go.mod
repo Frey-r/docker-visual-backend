@@ -1,14 +1,14 @@
 module docker-visual
 
-go 1.25.0
+go 1.23
 
 require (
-	github.com/docker/docker v28.5.2+incompatible
+	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-connections v0.7.0
 	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	golang.org/x/crypto v0.50.0
+	golang.org/x/crypto v0.31.0
 	modernc.org/sqlite v1.49.1
 )
 
