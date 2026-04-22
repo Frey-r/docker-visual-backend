@@ -21,31 +21,31 @@ import (
 
 // mockDockerClient implements docker.DockerClient for testing.
 type mockDockerClient struct {
-	containers      []types.Container
-	containerJSON   types.ContainerJSON
-	networks        []network.Inspect
-	networkInspect  network.Inspect
-	images          []image.Summary
-	volumes         []*volume.Volume
-	pingErr         error
-	listErr         error
-	startErr        error
-	stopErr         error
-	removeErr       error
-	createNetErr    error
-	createdNetID    string
-	runTunnelErr    error
+	containers     []types.Container
+	containerJSON  types.ContainerJSON
+	networks       []network.Inspect
+	networkInspect network.Inspect
+	images         []image.Summary
+	volumes        []*volume.Volume
+	pingErr        error
+	listErr        error
+	startErr       error
+	stopErr        error
+	removeErr      error
+	createNetErr   error
+	createdNetID   string
+	runTunnelErr   error
 }
 
-func (m *mockDockerClient) Ping(ctx context.Context) error                        { return m.pingErr }
+func (m *mockDockerClient) Ping(ctx context.Context) error { return m.pingErr }
 func (m *mockDockerClient) ListContainers(ctx context.Context) ([]types.Container, error) {
 	return m.containers, m.listErr
 }
 func (m *mockDockerClient) GetContainer(ctx context.Context, id string) (types.ContainerJSON, error) {
 	return m.containerJSON, m.listErr
 }
-func (m *mockDockerClient) StartContainer(ctx context.Context, id string) error   { return m.startErr }
-func (m *mockDockerClient) StopContainer(ctx context.Context, id string) error    { return m.stopErr }
+func (m *mockDockerClient) StartContainer(ctx context.Context, id string) error { return m.startErr }
+func (m *mockDockerClient) StopContainer(ctx context.Context, id string) error  { return m.stopErr }
 func (m *mockDockerClient) RemoveContainer(ctx context.Context, id string, force bool) error {
 	return m.removeErr
 }
@@ -72,6 +72,12 @@ func (m *mockDockerClient) BuildImage(ctx context.Context, buildContextPath, ima
 }
 func (m *mockDockerClient) CreateAndStartContainer(ctx context.Context, imageName, networkID, projectName string) error {
 	return nil
+}
+func (m *mockDockerClient) PullImage(ctx context.Context, imageName string) error {
+	return nil
+}
+func (m *mockDockerClient) CreateContainerFromImage(ctx context.Context, req models.CreateContainerRequest) (string, string, error) {
+	return "test-container-id", req.Name, nil
 }
 func (m *mockDockerClient) Close() error { return nil }
 

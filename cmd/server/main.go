@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
+	"docker-visual/internal/auth"
 	"docker-visual/internal/config"
 	"docker-visual/internal/docker"
 	"docker-visual/internal/handlers"
@@ -31,6 +33,22 @@ func main() {
 	}
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
 
+	// Ensure data directory exists
+	if err := os.MkdirAll(filepath.Dir(cfg.DBPath), 0755); err != nil {
+		log.Fatalf("Failed to create data directory: %v", err)
+	}
+
+	// Initialize user store
+	userStore, err := auth.NewUserStore(cfg.DBPath)
+	if err != nil {
+		log.Fatalf("Failed to initialize user store: %v", err)
+	}
+	defer userStore.Close()
+	slog.Info("user store initialized", "path", cfg.DBPath)
+
+	// Initialize JWT service
+	jwtService := auth.NewJWTService(cfg.JWTSecret, time.Duration(cfg.JWTExpireHours)*time.Hour)
+
 	// Connect to Docker
 	dockerClient, err := docker.NewClient()
 	if err != nil {
@@ -47,6 +65,7 @@ func main() {
 	// Create dependencies
 	tracker := jobs.NewTracker()
 	h := handlers.New(dockerClient, cfg, tracker)
+	authHandler := handlers.NewAuthHandler(userStore, jwtService)
 
 	// Setup Gin router
 	gin.SetMode(gin.ReleaseMode)
@@ -63,13 +82,20 @@ func main() {
 	// Routes
 	api := r.Group("/api")
 	{
-		// Public
+		// Public endpoints
 		api.GET("/health", h.Health)
+		api.GET("/auth/setup", authHandler.RequiresSetup)
+		api.POST("/auth/register", authHandler.Register)
+		api.POST("/auth/login", authHandler.Login)
 
-		// Protected (requires API key when configured)
+		// Protected (requires JWT token)
 		protected := api.Group("")
-		protected.Use(middleware.APIKeyAuth(cfg.APIKey))
+		protected.Use(middleware.JWTAuth(jwtService))
 		{
+			// Auth
+			protected.GET("/auth/me", authHandler.Me)
+
+			// Containers
 			protected.GET("/containers", h.ListContainers)
 			protected.POST("/containers", h.CreateContainer)
 			protected.GET("/containers/:id", h.GetContainer)
@@ -77,19 +103,25 @@ func main() {
 			protected.POST("/containers/:id/stop", h.StopContainer)
 			protected.DELETE("/containers/:id", h.RemoveContainer)
 
+			// Networks
 			protected.GET("/networks", h.ListNetworks)
 			protected.GET("/networks/:id", h.GetNetwork)
 
+			// Images
 			protected.GET("/images", h.ListImages)
 
+			// Volumes
 			protected.GET("/volumes", h.ListVolumes)
 
+			// Graph
 			protected.GET("/graph", h.GetGraphData)
 
+			// Projects
 			protected.POST("/projects", h.CreateProject)
 			protected.GET("/projects", h.ListProjects)
 			protected.POST("/projects/:name/tunnel", h.CreateTunnel)
 
+			// Deploy
 			protected.GET("/deploy/status/:name", h.GetDeployStatus)
 			protected.GET("/deploy/jobs", h.ListDeployJobs)
 		}
