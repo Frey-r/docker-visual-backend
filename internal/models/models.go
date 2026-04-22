@@ -94,3 +94,35 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 	Code  string `json:"code,omitempty"`
 }
+
+// PortMapping represents a port mapping for container creation.
+type PortMapping struct {
+	HostPort      int    `json:"host_port"`
+	ContainerPort int    `json:"container_port"`
+	Protocol      string `json:"protocol"` // tcp or udp
+}
+
+// VolumeMapping represents a volume mount for container creation.
+type VolumeMapping struct {
+	HostPath      string `json:"host_path"`
+	ContainerPath string `json:"container_path"`
+	ReadOnly      bool   `json:"read_only"`
+}
+
+// CreateContainerRequest is the request body for creating a container from an image.
+type CreateContainerRequest struct {
+	Image         string            `json:"image" binding:"required"`
+	Name          string            `json:"name"`
+	Env           map[string]string `json:"env"`
+	Ports         []PortMapping     `json:"ports"`
+	Volumes       []VolumeMapping   `json:"volumes"`
+	NetworkID     string            `json:"network_id"`
+	RestartPolicy string            `json:"restart_policy"` // no, always, unless-stopped, on-failure
+}
+
+// CreateContainerResponse is returned after container creation.
+type CreateContainerResponse struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Message string `json:"message"`
+}
